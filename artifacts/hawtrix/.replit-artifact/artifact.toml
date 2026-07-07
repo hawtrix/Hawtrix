@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/"
+title = "Hawtrix"
+version = "1.0.0"
+id = "artifacts/hawtrix"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/" ]
+localPort = 21742
+
+[services.development]
+run = "pnpm --filter @workspace/hawtrix run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/hawtrix", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/hawtrix", "run", "serve" ]
+
+[services.env]
+PORT = "21742"
+BASE_PATH = "/"

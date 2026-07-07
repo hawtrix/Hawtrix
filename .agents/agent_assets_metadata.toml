@@ -1,0 +1,20 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "YdBqW6VL8vzuHdIOexVer"
+uri = "file://artifacts/hawtrix/assets/images/icon.png"
+type = "image"
+title = "hawtrix_icon"
+
+[[generated]]
+id = "x3knHXTkuvL7uF3Q_em0W"
+uri = "file://artifacts/hawtrix/assets/images/hero_banner.png"
+type = "image"
+title = "hero_banner"
+
+[[generated]]
+id = "O71ANJKgRhZwqr44pSSJZ"
+uri = "file://artifacts/hawtrix/assets/images/splash.png"
+type = "image"
+title = "splash_screen"
