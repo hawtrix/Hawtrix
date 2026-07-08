@@ -41,6 +41,10 @@ function RootLayoutNav() {
       <Stack.Screen name="providers/[id]" />
       <Stack.Screen name="training/[id]" />
       <Stack.Screen name="opportunities/[id]" />
+      <Stack.Screen name="tools/index" />
+      <Stack.Screen name="tools/cv" />
+      <Stack.Screen name="tools/devis" />
+      <Stack.Screen name="tools/facture" />
     </Stack>
   );
 }

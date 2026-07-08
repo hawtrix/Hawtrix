@@ -18,3 +18,15 @@ id = "O71ANJKgRhZwqr44pSSJZ"
 uri = "file://artifacts/hawtrix/assets/images/splash.png"
 type = "image"
 title = "splash_screen"
+
+[[generated]]
+id = "C-pY7SWorIMSilaT2iCH6"
+uri = "file://artifacts/hawtrix-web/public/hero-professional.png"
+type = "image"
+title = "African professional using mobile app"
+
+[[generated]]
+id = "mOni17UdlZi6Fo6Ls-BSN"
+uri = "file://artifacts/hawtrix-web/public/team-collaboration.png"
+type = "image"
+title = "African professionals collaborating in modern office"

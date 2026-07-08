@@ -20,10 +20,10 @@ const CATEGORIES = [
 const QUICK_ACTIONS = [
   { icon: "sparkles", label: "IA Hawtrix", color: "#7C3AED", route: "/ai" },
   { icon: "people", label: "Réseau", color: "#FF6B00", route: "/network" },
+  { icon: "briefcase", label: "Outils Pro", color: "#10B981", route: "/tools" },
   { icon: "chatbubbles", label: "Messages", color: "#0F52BA", route: "/messages" },
-  { icon: "trending-up", label: "Dev. perso", color: "#10B981", route: "/development" },
+  { icon: "trending-up", label: "Dev. perso", color: "#059669", route: "/development" },
   { icon: "map", label: "Carte", color: "#EF4444", route: "/map" },
-  { icon: "notifications", label: "Alertes", color: "#F59E0B", route: "/notifications" },
 ];
 
 const SAMPLE_OPPORTUNITIES = [
