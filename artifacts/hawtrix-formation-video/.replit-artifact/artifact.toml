@@ -1,0 +1,31 @@
+kind = "video"
+previewPath = "/hawtrix-video/"
+title = "Hawtrix - Vidéo Formation"
+version = "1.0.0"
+id = "artifacts/hawtrix-formation-video"
+router = "path"
+
+[[integratedSkills]]
+name = "video-js"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/hawtrix-video/" ]
+localPort = 19874
+
+[services.development]
+run = "pnpm --filter @workspace/hawtrix-formation-video run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/hawtrix-formation-video", "run", "build" ]
+publicDir = "artifacts/hawtrix-formation-video/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19874"
+BASE_PATH = "/hawtrix-video/"

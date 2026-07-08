@@ -30,3 +30,21 @@ id = "mOni17UdlZi6Fo6Ls-BSN"
 uri = "file://artifacts/hawtrix-web/public/team-collaboration.png"
 type = "image"
 title = "African professionals collaborating in modern office"
+
+[[generated]]
+id = "z4IQKgXiJNid-ExN0WMTQ"
+uri = "file://artifacts/hawtrix-formation-video/public/images/african-professional.png"
+type = "image"
+title = "African man smiling phone"
+
+[[generated]]
+id = "RBIoJS9GJ-SXlfdkElqV-"
+uri = "file://artifacts/hawtrix-formation-video/public/images/digital-money.png"
+type = "image"
+title = "Money digital tech screen"
+
+[[generated]]
+id = "rKnWPBgrvGl1IxwqiI0hw"
+uri = "file://artifacts/hawtrix-formation-video/public/images/freelance-workspace.png"
+type = "image"
+title = "Freelance workspace tech"
