@@ -1,5 +1,4 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "YdBqW6VL8vzuHdIOexVer"
@@ -48,3 +47,39 @@ id = "rKnWPBgrvGl1IxwqiI0hw"
 uri = "file://artifacts/hawtrix-formation-video/public/images/freelance-workspace.png"
 type = "image"
 title = "Freelance workspace tech"
+
+[[generated]]
+id = "Az2sNw4i1zTXrqQErr61D"
+uri = "file://artifacts/hawtrix-formation-video/public/images/scene_crypto.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "cvNpqCSVZ2CF-KFk1_GZc"
+uri = "file://artifacts/hawtrix-formation-video/public/images/scene_code.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "juso_qtaxr5H9Cn2ALiuz"
+uri = "file://artifacts/hawtrix-formation-video/public/images/scene_apps.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "e0u6Kbl6bkBSCm6k-ENHg"
+uri = "file://artifacts/hawtrix-formation-video/public/images/scene_trading.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "jegzRn00b8S1n-SBjKswh"
+uri = "file://artifacts/hawtrix-formation-video/public/images/scene_formation.png"
+type = "image"
+title = "generated_image"
+
+[[outputs]]
+id = "oEmfqp-P_m1qjPZU3gl0T"
+uri = "file://artifacts/hawtrix-formation-video/public/audio/bg_music.mp3"
+type = "audio"
+title = "hawtrix formation background music"
