@@ -18,7 +18,15 @@
     },
     "android": {},
     "web": {
-      "favicon": "./assets/images/icon.png"
+      "favicon": "./assets/images/icon.png",
+      "name": "Hawtrix",
+      "shortName": "Hawtrix",
+      "description": "La plateforme tout-en-un pour les professionnels africains",
+      "themeColor": "#0A1628",
+      "backgroundColor": "#0A1628",
+      "lang": "fr",
+      "display": "standalone",
+      "orientation": "portrait"
     },
     "plugins": [
       [

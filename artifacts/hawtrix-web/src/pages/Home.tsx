@@ -7,10 +7,14 @@ import {
   MessageSquare, 
   CreditCard,
   ShieldCheck,
-  ArrowRight,
   Download,
   Menu,
-  X
+  X,
+  Smartphone,
+  Share2,
+  PlusSquare,
+  Chrome,
+  ExternalLink
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -48,9 +52,19 @@ const features = [
   }
 ];
 
+// URL de l'application (chemin racine du même domaine)
+function getAppUrl() {
+  return window.location.origin + "/";
+}
+
 export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showInstallGuide, setShowInstallGuide] = useState(false);
   const baseUrl = import.meta.env.BASE_URL;
+
+  const handleOpenApp = () => {
+    window.open(getAppUrl(), "_blank");
+  };
 
   return (
     <div className="min-h-screen bg-white text-primary flex flex-col font-sans overflow-x-hidden">
@@ -63,16 +77,22 @@ export default function Home() {
           
           <div className="hidden md:flex items-center gap-8 text-sm font-medium">
             <a href="#features" className="hover:text-accent transition-colors">Fonctionnalités</a>
+            <a href="#installer" className="hover:text-accent transition-colors">Installer</a>
             <a href="#about" className="hover:text-accent transition-colors">Notre Mission</a>
             <div className="flex items-center gap-2 text-accent bg-accent/10 px-3 py-1.5 rounded-full font-bold">
               <ShieldCheck className="w-4 h-4" />
-              Professionnels vérifiés
+              Gratuit
             </div>
           </div>
           
           <div className="hidden md:flex items-center gap-4">
-            <Button variant="default" className="bg-accent text-white hover:bg-accent/90 rounded-full px-6">
-              Télécharger l'App
+            <Button 
+              onClick={handleOpenApp}
+              variant="default" 
+              className="bg-accent text-white hover:bg-accent/90 rounded-full px-6 flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Installer l'App
             </Button>
           </div>
 
@@ -92,13 +112,14 @@ export default function Home() {
             className="md:hidden bg-white border-b border-gray-100 p-6 flex flex-col gap-4"
           >
             <a href="#features" onClick={() => setIsMenuOpen(false)} className="text-lg font-medium">Fonctionnalités</a>
+            <a href="#installer" onClick={() => setIsMenuOpen(false)} className="text-lg font-medium">Installer l'app</a>
             <a href="#about" onClick={() => setIsMenuOpen(false)} className="text-lg font-medium">Notre Mission</a>
-            <div className="flex items-center gap-2 text-accent bg-accent/10 px-4 py-2 rounded-lg font-bold w-fit">
-              <ShieldCheck className="w-5 h-5" />
-              Professionnels vérifiés
-            </div>
-            <Button variant="default" className="bg-accent text-white hover:bg-accent/90 rounded-full w-full mt-4">
-              Télécharger l'App
+            <Button 
+              onClick={() => { setIsMenuOpen(false); handleOpenApp(); }}
+              variant="default" 
+              className="bg-accent text-white hover:bg-accent/90 rounded-full w-full mt-4"
+            >
+              Ouvrir l'application
             </Button>
           </motion.div>
         )}
@@ -145,14 +166,31 @@ export default function Home() {
                 transition={{ duration: 0.5, delay: 0.3 }}
                 className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4"
               >
-                <a href="#" className="flex items-center justify-center gap-3 bg-primary text-white px-8 py-4 rounded-full font-bold w-full sm:w-auto hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95">
+                <button
+                  onClick={handleOpenApp}
+                  className="flex items-center justify-center gap-3 bg-accent text-white px-8 py-4 rounded-full font-bold w-full sm:w-auto hover:bg-accent/90 transition-transform hover:scale-105 active:scale-95 shadow-xl"
+                >
                   <Download className="w-5 h-5" />
-                  App Store
+                  Télécharger gratuitement
+                </button>
+                <a 
+                  href="#installer"
+                  className="flex items-center justify-center gap-3 border-2 border-primary text-primary px-8 py-4 rounded-full font-bold w-full sm:w-auto hover:bg-primary/5 transition-all"
+                >
+                  <Smartphone className="w-5 h-5" />
+                  Comment installer ?
                 </a>
-                <a href="#" className="flex items-center justify-center gap-3 bg-accent text-white px-8 py-4 rounded-full font-bold w-full sm:w-auto hover:bg-accent/90 transition-transform hover:scale-105 active:scale-95">
-                  <Download className="w-5 h-5" />
-                  Google Play
-                </a>
+              </motion.div>
+
+              {/* Badge "sans store" */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5 }}
+                className="mt-6 flex items-center justify-center lg:justify-start gap-3 text-sm text-gray-500"
+              >
+                <ShieldCheck className="w-4 h-4 text-green-500" />
+                Gratuit · Sans App Store · Sans Google Play · Directement sur votre téléphone
               </motion.div>
             </div>
             
@@ -209,8 +247,136 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ===== SECTION INSTALLER ===== */}
+      <section id="installer" className="py-24 px-6 bg-white">
+        <div className="container mx-auto max-w-4xl">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-14"
+          >
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 text-accent font-semibold text-sm mb-6">
+              <Download className="w-4 h-4" />
+              Sans App Store ni Google Play
+            </div>
+            <h2 className="text-4xl lg:text-5xl font-bold mb-5">Installer Hawtrix sur votre téléphone</h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Hawtrix fonctionne directement depuis votre navigateur et s'installe en quelques secondes, comme une vraie application.
+            </p>
+          </motion.div>
+
+          {/* Bouton principal */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            className="flex justify-center mb-14"
+          >
+            <button
+              onClick={handleOpenApp}
+              className="flex items-center gap-4 bg-accent text-white px-10 py-5 rounded-2xl font-bold text-xl hover:bg-accent/90 transition-transform hover:scale-105 shadow-2xl"
+            >
+              <ExternalLink className="w-6 h-6" />
+              Ouvrir l'application Hawtrix
+            </button>
+          </motion.div>
+
+          {/* Guide installation */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Android */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              className="bg-gray-50 rounded-3xl p-8 border border-gray-100"
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center">
+                  <Chrome className="w-6 h-6 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold">Android (Chrome)</h3>
+                  <p className="text-sm text-gray-500">Installation en 3 clics</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                {[
+                  { num: "1", text: 'Cliquez sur "Ouvrir l\'application" ci-dessus' },
+                  { num: "2", text: 'Chrome affiche une bannière "Ajouter à l\'écran d\'accueil" → Acceptez' },
+                  { num: "3", text: "Hawtrix apparaît sur votre bureau comme une vraie app ✓" },
+                ].map(step => (
+                  <div key={step.num} className="flex items-start gap-4">
+                    <div className="w-8 h-8 bg-green-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <span className="text-white font-bold text-sm">{step.num}</span>
+                    </div>
+                    <p className="text-gray-700 text-sm leading-relaxed pt-1">{step.text}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6 bg-green-50 rounded-xl p-4 border border-green-100">
+                <p className="text-sm text-green-700 font-medium">💡 Si Chrome ne propose pas la bannière automatiquement :</p>
+                <p className="text-sm text-green-600 mt-1">Menu ⋮ → <strong>Ajouter à l'écran d'accueil</strong></p>
+              </div>
+            </motion.div>
+
+            {/* iPhone */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              className="bg-gray-50 rounded-3xl p-8 border border-gray-100"
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center">
+                  <Smartphone className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold">iPhone (Safari)</h3>
+                  <p className="text-sm text-gray-500">Via Safari uniquement</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                {[
+                  { num: "1", text: 'Ouvrez le lien de l\'app dans Safari (pas Chrome)' },
+                  { num: "2", text: 'Appuyez sur l\'icône Partager ⬆ en bas de l\'écran' },
+                  { num: "3", text: 'Faites défiler et choisissez "Sur l\'écran d\'accueil" → Ajouter' },
+                ].map(step => (
+                  <div key={step.num} className="flex items-start gap-4">
+                    <div className="w-8 h-8 bg-blue-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <span className="text-white font-bold text-sm">{step.num}</span>
+                    </div>
+                    <p className="text-gray-700 text-sm leading-relaxed pt-1">{step.text}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6 bg-blue-50 rounded-xl p-4 border border-blue-100">
+                <div className="flex items-center gap-2 mb-1">
+                  <Share2 className="w-4 h-4 text-blue-600" />
+                  <p className="text-sm text-blue-700 font-medium">Icône Partager</p>
+                </div>
+                <p className="text-sm text-blue-600">L'icône ressemble à un carré avec une flèche vers le haut, en bas de l'écran Safari.</p>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Note gratuit */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="mt-8 text-center"
+          >
+            <div className="inline-flex items-center gap-2 px-5 py-3 bg-primary text-white rounded-2xl text-sm font-medium">
+              <ShieldCheck className="w-4 h-4" />
+              Téléchargement 100% gratuit · Aucun compte store requis · Fonctionne hors ligne
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
       {/* Deep Dive / Mission */}
-      <section id="about" className="py-24 px-6 relative">
+      <section id="about" className="py-24 px-6 relative bg-gray-50">
         <div className="container mx-auto">
           <div className="flex flex-col-reverse lg:flex-row items-center gap-16">
             <motion.div 
@@ -303,7 +469,7 @@ export default function Home() {
             transition={{ delay: 0.1 }}
             className="text-xl text-gray-600 mb-12"
           >
-            Téléchargez l'application Hawtrix dès aujourd'hui et accédez à un monde d'opportunités.
+            Installez Hawtrix dès maintenant — gratuit, sans App Store, directement sur votre téléphone.
           </motion.p>
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -312,13 +478,19 @@ export default function Home() {
             transition={{ delay: 0.2 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-6"
           >
-            <a href="#" className="flex items-center justify-center gap-3 bg-primary text-white px-10 py-5 rounded-full font-bold text-lg w-full sm:w-auto hover:bg-primary/90 transition-transform hover:scale-105 shadow-xl">
+            <button
+              onClick={handleOpenApp}
+              className="flex items-center justify-center gap-3 bg-accent text-white px-10 py-5 rounded-full font-bold text-lg w-full sm:w-auto hover:bg-accent/90 transition-transform hover:scale-105 shadow-xl"
+            >
               <Download className="w-6 h-6" />
-              Télécharger sur l'App Store
-            </a>
-            <a href="#" className="flex items-center justify-center gap-3 bg-accent text-white px-10 py-5 rounded-full font-bold text-lg w-full sm:w-auto hover:bg-accent/90 transition-transform hover:scale-105 shadow-xl">
-              <Download className="w-6 h-6" />
-              Obtenir sur Google Play
+              Installer l'application
+            </button>
+            <a
+              href="#installer"
+              className="flex items-center justify-center gap-3 border-2 border-primary text-primary px-10 py-5 rounded-full font-bold text-lg w-full sm:w-auto hover:bg-primary/5 transition-all"
+            >
+              <Smartphone className="w-6 h-6" />
+              Guide d'installation
             </a>
           </motion.div>
         </div>
