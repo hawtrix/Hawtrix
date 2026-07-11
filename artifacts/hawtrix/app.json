@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Hawtrix",
-    "slug": "hawtrix",
+    "slug": "npx-eas-cli-build-platform-android-profile-apk-non-interactive",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -48,6 +48,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b372fe33-2c21-45ca-a863-103031ace8bd"
+      }
+    },
+    "owner": "hawtrix-hub"
   }
 }
