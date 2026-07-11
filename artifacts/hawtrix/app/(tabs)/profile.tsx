@@ -90,7 +90,7 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        {nextGrade && user.grade !== "directeur" && (
+        {nextGrade && !["directeur2", "directeur5", "president"].includes(user.grade) && (
           <View style={styles.progressCard}>
             <View style={styles.progressHeader}>
               <Text style={styles.progressTitle}>Progression vers {GRADE_INFO[nextGrade[0] as keyof typeof GRADE_INFO]?.label}</Text>

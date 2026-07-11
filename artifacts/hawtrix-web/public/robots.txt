@@ -1,2 +1,27 @@
 User-agent: *
 Allow: /
+
+# Sitemaps
+Sitemap: https://www.hawtrix.com/sitemap.xml
+
+# Autoriser tous les bots IA et moteurs de recherche
+User-agent: GPTBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /

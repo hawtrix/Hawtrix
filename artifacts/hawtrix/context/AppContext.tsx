@@ -10,6 +10,8 @@ export type Grade =
   | "magnat"
   | "icone"
   | "directeur"
+  | "directeur2"
+  | "directeur5"
   | "president";
 
 export interface NetworkMember {
@@ -39,6 +41,7 @@ export interface User {
   avatar?: string;
   bio?: string;
   skills?: string[];
+  inviteLimit?: number | null;
 }
 
 export interface Message {
@@ -86,6 +89,7 @@ interface AppContextType {
   getOrCreateConversation: (participantId: string, participantName: string) => string;
   markConversationRead: (id: string) => void;
   logout: () => Promise<void>;
+  isSpecialPhone: (phone: string) => boolean;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -99,9 +103,56 @@ function generateCode(length = 8): string {
   return code;
 }
 
+// Comptes spéciaux pré-créés
+const SPECIAL_ACCOUNTS: Record<string, User> = {
+  "+22890496651": {
+    id: "president-001",
+    name: "Fondateur",
+    surname: "Hawtrix",
+    profession: "Président Fondateur",
+    neighborhood: "Lomé, Togo",
+    phone: "+22890496651",
+    referralCode: "HWT-PRESIDENT",
+    referrerId: null,
+    grade: "president",
+    joinedAt: "2025-01-01T00:00:00.000Z",
+    totalEarnings: 0,
+    networkCount: 0,
+    branches: {},
+    tutorialSeen: true,
+    inviteLimit: 2,
+  },
+  "+22892525577": {
+    id: "admin-002",
+    name: "Admin",
+    surname: "Hawtrix",
+    profession: "Directeur Général",
+    neighborhood: "Lomé, Togo",
+    phone: "+22892525577",
+    referralCode: "HWT-ADMIN001",
+    referrerId: "HWT-PRESIDENT",
+    grade: "directeur",
+    joinedAt: "2025-01-01T00:00:00.000Z",
+    totalEarnings: 0,
+    networkCount: 0,
+    branches: {},
+    tutorialSeen: true,
+    inviteLimit: null,
+  },
+};
+
 function calculateGrade(networkCount: number, branches: Record<string, string[]>): Grade {
   const branchCount = Object.keys(branches).length;
+
+  // Directeur 5★ : 1 000 000 personnes + 2 directeurs 2★ sur 2 branches différentes
+  if (networkCount >= 1000000 && branchCount >= 2) return "directeur5";
+
+  // Directeur 2★ : 100 000 personnes + 4 directeurs sur 4 branches différentes
+  if (networkCount >= 100000 && branchCount >= 4) return "directeur2";
+
+  // Directeur simple : 10 000 personnes
   if (networkCount >= 10000) return "directeur";
+
   if (networkCount >= 1000) return "icone";
   if (networkCount >= 500) return "magnat";
   if (networkCount >= 250) return "emeraude";
@@ -112,15 +163,17 @@ function calculateGrade(networkCount: number, branches: Record<string, string[]>
 }
 
 export const GRADE_INFO: Record<Grade, { label: string; color: string; minCount: number; dividendPct: number; cardLevel: number }> = {
-  membre: { label: "Membre", color: "#6B7280", minCount: 0, dividendPct: 0, cardLevel: 0 },
-  pionier: { label: "Pionier", color: "#CD7F32", minCount: 10, dividendPct: 0, cardLevel: 1 },
-  saphir: { label: "Saphir", color: "#0F52BA", minCount: 35, dividendPct: 0, cardLevel: 2 },
-  rubis: { label: "Rubis", color: "#9B111E", minCount: 100, dividendPct: 0, cardLevel: 3 },
-  emeraude: { label: "Emeraude", color: "#50C878", minCount: 250, dividendPct: 0, cardLevel: 4 },
-  magnat: { label: "Magnat", color: "#B8860B", minCount: 500, dividendPct: 4, cardLevel: 5 },
-  icone: { label: "Icone", color: "#8B008B", minCount: 1000, dividendPct: 8, cardLevel: 6 },
-  directeur: { label: "Directeur", color: "#FF6B00", minCount: 10000, dividendPct: 14, cardLevel: 7 },
-  president: { label: "Président Fondateur", color: "#FFD700", minCount: 999999, dividendPct: 76, cardLevel: 8 },
+  membre:     { label: "Membre",             color: "#6B7280", minCount: 0,        dividendPct: 0,   cardLevel: 0 },
+  pionier:    { label: "Pionier",            color: "#CD7F32", minCount: 10,       dividendPct: 0,   cardLevel: 1 },
+  saphir:     { label: "Saphir",             color: "#0F52BA", minCount: 35,       dividendPct: 0,   cardLevel: 2 },
+  rubis:      { label: "Rubis",              color: "#9B111E", minCount: 100,      dividendPct: 0,   cardLevel: 3 },
+  emeraude:   { label: "Emeraude",           color: "#50C878", minCount: 250,      dividendPct: 0,   cardLevel: 4 },
+  magnat:     { label: "Magnat",             color: "#B8860B", minCount: 500,      dividendPct: 4,   cardLevel: 5 },
+  icone:      { label: "Icone",              color: "#8B008B", minCount: 1000,     dividendPct: 8,   cardLevel: 6 },
+  directeur:  { label: "Directeur",          color: "#FF6B00", minCount: 10000,    dividendPct: 6,   cardLevel: 7 },
+  directeur2: { label: "Directeur ⭐⭐",     color: "#E8B800", minCount: 100000,   dividendPct: 14,  cardLevel: 8 },
+  directeur5: { label: "Directeur ⭐⭐⭐⭐⭐", color: "#C0A020", minCount: 1000000, dividendPct: 30,  cardLevel: 9 },
+  president:  { label: "Président Fondateur",color: "#FFD700", minCount: 9999999,  dividendPct: 40,  cardLevel: 10 },
 };
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -154,6 +207,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const isSpecialPhone = useCallback((phone: string): boolean => {
+    const clean = phone.replace(/\s/g, "");
+    return clean in SPECIAL_ACCOUNTS;
+  }, []);
+
   const setTermsAccepted = useCallback(async (v: boolean) => {
     setTermsAcceptedState(v);
     await AsyncStorage.setItem("hawtrix_terms", JSON.stringify(v));
@@ -165,7 +223,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const createUser = useCallback(async (data: Omit<User, "id" | "referralCode" | "grade" | "joinedAt" | "totalEarnings" | "networkCount" | "branches" | "tutorialSeen">) => {
-    const newUser: User = {
+    // Vérifier si c'est un compte spécial pré-créé
+    const cleanPhone = (data.phone ?? "").replace(/\s/g, "");
+    const seeded = SPECIAL_ACCOUNTS[cleanPhone];
+
+    const newUser: User = seeded ? { ...seeded } : {
       ...data,
       id: Date.now().toString() + Math.random().toString(36).substr(2, 6),
       referralCode: generateCode(),
@@ -176,8 +238,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       branches: {},
       tutorialSeen: false,
     };
+
     setUser(newUser);
     await AsyncStorage.setItem("hawtrix_user", JSON.stringify(newUser));
+
+    // Comptes spéciaux : paiement déjà effectué
+    if (seeded) {
+      await setPaymentDone(true);
+      await setTermsAccepted(true);
+    }
+
     addNotification({ title: "Bienvenue sur Hawtrix!", body: "Votre compte a été créé avec succès.", type: "system" });
   }, []);
 
@@ -185,7 +255,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUser(prev => {
       if (!prev) return prev;
       const updated = { ...prev, ...data };
-      updated.grade = calculateGrade(updated.networkCount, updated.branches);
+      // Ne pas recalculer le grade pour les comptes spéciaux (président)
+      if (updated.phone && !SPECIAL_ACCOUNTS[updated.phone.replace(/\s/g, "")]) {
+        updated.grade = calculateGrade(updated.networkCount, updated.branches);
+      }
       AsyncStorage.setItem("hawtrix_user", JSON.stringify(updated));
       return updated;
     });
@@ -275,7 +348,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       user, termsAccepted, paymentDone, conversations, notifications, isLoading,
       setTermsAccepted, setPaymentDone, createUser, updateUser, markTutorialSeen,
       addNotification, markNotificationRead, sendMessage, getOrCreateConversation,
-      markConversationRead, logout,
+      markConversationRead, logout, isSpecialPhone,
     }}>
       {children}
     </AppContext.Provider>

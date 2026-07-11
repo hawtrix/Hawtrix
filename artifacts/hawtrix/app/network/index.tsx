@@ -22,9 +22,11 @@ const GRADES_DISPLAY = [
   { grade: "saphir" as Grade, minCount: 35, benefit: "Avantages supérieurs + arbre des filleuls" },
   { grade: "rubis" as Grade, minCount: 100, benefit: "Statut honorifique + carte élégante" },
   { grade: "emeraude" as Grade, minCount: 250, benefit: "Carte prestige + avantages exclusifs" },
-  { grade: "magnat" as Grade, minCount: 500, benefit: "Dividendes sur revenus plateforme" },
-  { grade: "icone" as Grade, minCount: 1000, benefit: "Dividendes majorés + statut d'icône" },
-  { grade: "directeur" as Grade, minCount: 10000, benefit: "Top dividendes + avantages directs 1500F" },
+  { grade: "magnat" as Grade, minCount: 500, benefit: "Dividendes 4% sur revenus plateforme" },
+  { grade: "icone" as Grade, minCount: 1000, benefit: "Dividendes 8% majorés + statut d'icône" },
+  { grade: "directeur" as Grade, minCount: 10000, benefit: "Directeur : 6% dividendes + avantages directs" },
+  { grade: "directeur2" as Grade, minCount: 100000, benefit: "⭐⭐ 100 000 membres + 4 directeurs sur 4 branches · 14% dividendes" },
+  { grade: "directeur5" as Grade, minCount: 1000000, benefit: "⭐⭐⭐⭐⭐ 1 000 000 membres + 2 Directeurs ⭐⭐ sur 2 branches · 30% dividendes" },
 ];
 
 export default function NetworkScreen() {
