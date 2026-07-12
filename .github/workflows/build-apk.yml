@@ -50,7 +50,8 @@ jobs:
             "devDependencies": {
               "@babel/core": "^7.25.2",
               "@types/react": "~19.1.10",
-              "typescript": "~5.9.2"
+              "typescript": "~5.9.2",
+              "babel-plugin-module-resolver": "^5.0.2"
             }
           }
           PKGJSON
@@ -64,13 +65,6 @@ jobs:
 
           config.watchFolders = [projectRoot];
           config.resolver.nodeModulesPaths = [path.resolve(projectRoot, 'node_modules')];
-
-          // Force the "@/" import alias (used throughout the app, e.g. "@/utils/api")
-          // to resolve to the project root, regardless of tsconfig.json path support.
-          config.resolver.alias = {
-            ...(config.resolver.alias || {}),
-            '@': projectRoot,
-          };
 
           module.exports = config;
           METROJS
@@ -191,6 +185,57 @@ jobs:
             echo "Aucune dépendance manquante détectée."
           fi
           npm install
+
+      - name: Write babel.config.js (module-resolver alias + reanimated/worklets support)
+        run: |
+          cat > detect-worklets.mjs << 'DETECTWORKLETS'
+          import { readFileSync } from "fs";
+          const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+          const all = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+          console.log(all["react-native-worklets"] ? "true" : "false");
+          DETECTWORKLETS
+          HAS_WORKLETS=$(node detect-worklets.mjs)
+
+          if [ "$HAS_WORKLETS" = "true" ]; then
+            cat > babel.config.js << 'BABELJS'
+          module.exports = function (api) {
+            api.cache(true);
+            return {
+              presets: ['babel-preset-expo'],
+              plugins: [
+                [
+                  'module-resolver',
+                  {
+                    root: ['./'],
+                    alias: { '@': './' },
+                  },
+                ],
+                'react-native-worklets/plugin',
+              ],
+            };
+          };
+          BABELJS
+          else
+            cat > babel.config.js << 'BABELJS'
+          module.exports = function (api) {
+            api.cache(true);
+            return {
+              presets: ['babel-preset-expo'],
+              plugins: [
+                [
+                  'module-resolver',
+                  {
+                    root: ['./'],
+                    alias: { '@': './' },
+                  },
+                ],
+              ],
+            };
+          };
+          BABELJS
+          fi
+          echo "--- babel.config.js ---"
+          cat babel.config.js
 
       - name: Expo Prebuild (Android)
         run: npx expo prebuild --platform android --no-install
