@@ -160,6 +160,18 @@ jobs:
             }
           }
 
+          // 3. Known implicit peer dependencies not directly imported in JS/config
+          const implicitPeers = {
+            "react-native-reanimated": ["react-native-worklets"],
+          };
+          for (const [trigger, peers] of Object.entries(implicitPeers)) {
+            if (known.has(trigger) || found.has(trigger)) {
+              for (const peer of peers) {
+                if (!known.has(peer) && !found.has(peer)) found.add(peer);
+              }
+            }
+          }
+
           console.log([...found].join("\n"));
           DETECTJS
 
