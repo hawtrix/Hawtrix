@@ -113,12 +113,13 @@ export default function RegisterScreen() {
           <TextInput
             style={styles.input}
             value={referrerId}
-            onChangeText={setReferrerId}
-            placeholder="HWT-XXXXXXXX"
+            onChangeText={t => setReferrerId(t.toUpperCase())}
+            placeholder="ex: HK3MZ"
             placeholderTextColor="#9CA3AF"
             autoCapitalize="characters"
+            maxLength={12}
           />
-          <Text style={styles.hint}>Si vous avez un code d'identification, entrez-le ici</Text>
+          <Text style={styles.hint}>Code 5 caractères de votre parrain (ex: HK3MZ)</Text>
         </View>
 
         <View style={{ paddingHorizontal: 16 }}>
