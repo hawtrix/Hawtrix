@@ -24,7 +24,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Write package.json and npmrc
+      - name: Write package.json, npmrc and metro.config.js
         run: |
           cat > package.json << 'PKGJSON'
           {
@@ -71,6 +71,20 @@ jobs:
           }
           PKGJSON
           echo "legacy-peer-deps=true" > .npmrc
+          cat > metro.config.js << 'METROJS'
+          const { getDefaultConfig } = require('expo/metro-config');
+          const path = require('path');
+
+          const projectRoot = __dirname;
+          const config = getDefaultConfig(projectRoot);
+
+          // Empêche Metro de remonter vers la racine du dépôt Git (monorepo)
+          // et de chercher un node_modules qui n'existe pas à cet endroit.
+          config.watchFolders = [projectRoot];
+          config.resolver.nodeModulesPaths = [path.resolve(projectRoot, 'node_modules')];
+
+          module.exports = config;
+          METROJS
 
       - name: Install dependencies
         run: npm install
