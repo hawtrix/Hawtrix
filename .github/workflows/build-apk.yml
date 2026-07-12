@@ -1,5 +1,4 @@
 name: Build Android APK
-
 on:
   push:
     branches: [main]
@@ -17,11 +16,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -62,7 +59,6 @@ jobs:
               "react-native-screens": "~4.16.0",
               "react-native-svg": "15.12.1",
               "@expo/vector-icons": "^15.0.3",
-              "@expo-google-fonts/inter": "^0.4.0",
               "@react-native-async-storage/async-storage": "2.2.0",
               "@tanstack/react-query": "^5.90.21",
               "zod": "^3.25.76"
@@ -84,35 +80,14 @@ jobs:
       - name: Expo Prebuild (Android)
         run: npx expo prebuild --platform android --no-install
 
-      - name: Disable minification for release
-        run: |
-          sed -i 's/minifyEnabled enableProguardInReleaseBuilds/minifyEnabled false/' android/app/build.gradle || true
-          grep -n "minifyEnabled" android/app/build.gradle || true
-
       - name: Build release APK
-        run: |
-          cd android
-          chmod +x gradlew
-          set -o pipefail
-          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee /tmp/gradle-full.log
+        run: cd android && chmod +x gradlew && ./gradlew assembleRelease --no-daemon
         env:
           GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g
 
-      - name: Print failure summary (copy this if it fails)
-        if: always()
-        run: |
-          echo "===== Metro/Node bundler output ====="
-          grep -n -B2 -A80 "createBundleReleaseJsAndAssets" /tmp/gradle-full.log | head -n 200 || true
-          echo
-          echo "===== FAILURE / What went wrong ====="
-          awk '/FAILURE: Build failed|What went wrong/{found=1} found' /tmp/gradle-full.log | head -n 100 || true
-
-      - name: Find APK
-        run: find android/app/build/outputs/apk -name "*.apk"
-
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: hawtrix-apk
-          path: android/app/build/outputs/apk/release/*.apk
+          path: artifacts/hawtrix/android/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
