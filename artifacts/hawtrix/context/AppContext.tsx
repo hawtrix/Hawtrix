@@ -94,13 +94,20 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | null>(null);
 
-function generateCode(length = 8): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "HWT-";
-  for (let i = 0; i < length; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
+function generateCode(): string {
+  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const digits = "23456789";
+  const all = letters + digits;
+
+  // Generate 4 random chars, then insert 1 guaranteed digit at a random position
+  const arr: string[] = [];
+  for (let i = 0; i < 4; i++) {
+    arr.push(all[Math.floor(Math.random() * all.length)]);
   }
-  return code;
+  const digitPos = Math.floor(Math.random() * 5);
+  arr.splice(digitPos, 0, digits[Math.floor(Math.random() * digits.length)]);
+
+  return arr.join(""); // 5 chars, e.g. "HK3MZ", "B7ACF"
 }
 
 // Comptes spéciaux pré-créés
