@@ -83,11 +83,6 @@ jobs:
       - name: Expo Prebuild (Android)
         run: npx expo prebuild --platform android --no-install
 
-      # Disable R8/ProGuard minification for the release build type.
-      # Minification is the #1 cause of a release build failing when the
-      # equivalent debug build succeeds (missing keep rules for native
-      # modules). Turning it off trades a slightly bigger APK for a build
-      # that actually completes -- safe for testing/internal distribution.
       - name: Disable minification for release
         run: |
           sed -i 's/minifyEnabled enableProguardInReleaseBuilds/minifyEnabled false/' android/app/build.gradle || true
@@ -99,28 +94,22 @@ jobs:
           chmod +x gradlew
           set -o pipefail
           ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee /tmp/gradle-full.log
-        env:
-          GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g
 
-      # Runs even if the build above failed, and produces one short,
-      # easy-to-read text file with just the actual error -- no more
-      # scrolling through hundreds of log lines in a mobile browser.
-      - name: Extract failure summary
+      - name: Print failure summary (copy this if it fails)
         if: always()
         run: |
-          {
-            echo "===== FAILURE / What went wrong ====="
-            awk '/FAILURE: Build failed|What went wrong/{found=1} found' /tmp/gradle-full.log | head -n 150
-            echo
-            echo "===== First compiler error/exception lines ====="
-            grep -n -E "error:|Exception|FAILED$|Caused by" /tmp/gradle-full.log | head -n 60
-          } > /tmp/failure-summary.txt || echo "No failure summary extracted" > /tmp/failure-summary.txt
-          cat /tmp/failure-summary.txt
+          echo "===== Metro/Node bundler output ====="
+          grep -n -B2 -A80 "createBundleReleaseJsAndAssets" /tmp/gradle-full.log | head -n 200 || true
+          echo
+          echo "===== FAILURE / What went wrong ====="
+          awk '/FAILURE: Build failed|What went wrong/{found=1} found' /tmp/gradle-full.log | head -n 100 || true
 
-      - name: Upload failure summary
-        if: always()
+      - name: Find APK
+        run: find android/app/build/outputs/apk -name "*.apk"
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: build-failure-summary
-          path: /tmp/failure-summary.txt
+          name: hawtrix-apk
+          path: android/app/build/outputs/apk/release/*.apk
           retention-days: 30
