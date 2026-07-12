@@ -65,6 +65,13 @@ jobs:
           config.watchFolders = [projectRoot];
           config.resolver.nodeModulesPaths = [path.resolve(projectRoot, 'node_modules')];
 
+          // Force the "@/" import alias (used throughout the app, e.g. "@/utils/api")
+          // to resolve to the project root, regardless of tsconfig.json path support.
+          config.resolver.alias = {
+            ...(config.resolver.alias || {}),
+            '@': projectRoot,
+          };
+
           module.exports = config;
           METROJS
 
