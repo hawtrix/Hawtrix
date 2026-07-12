@@ -62,7 +62,7 @@ jobs:
               typescript:'~5.9.2'
             }
           },null,2));
-          fs.writeFileSync('.npmrc','legacy-peer-deps=true\nignore-scripts=true\n');
+          fs.writeFileSync('.npmrc','legacy-peer-deps=true\n');
           "
 
       - name: Install dependencies
@@ -74,9 +74,10 @@ jobs:
         run: npx expo prebuild --platform android --no-install
 
       - name: Build debug APK
-        run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+        run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon --stacktrace
         env:
           GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g
+          NODE_PATH: ${{ github.workspace }}/artifacts/hawtrix/node_modules
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
