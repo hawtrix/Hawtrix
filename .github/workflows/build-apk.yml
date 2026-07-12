@@ -83,14 +83,25 @@ jobs:
       - name: Expo Prebuild (Android)
         run: npx expo prebuild --platform android --no-install
 
-      - name: Build debug APK
-        run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+      # CHANGED: build a RELEASE APK, not debug.
+      # A "debug" build does not embed the JavaScript bundle -- it expects a
+      # Metro dev server reachable on the network at all times. Installed
+      # standalone (no dev server around), the app hangs forever on the splash
+      # screen waiting for JS that will never arrive. A release build bundles
+      # the JS (via Hermes) directly into the APK, so it works standalone.
+      - name: Build release APK
+        run: cd android && chmod +x gradlew && ./gradlew assembleRelease --no-daemon
         env:
           GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g
 
+      # CHANGED: path now points at the release output.
+      # Expo's default prebuild template signs the "release" build type with
+      # the debug keystore already, so this APK is directly installable
+      # without any extra signing step (fine for testing/internal sharing;
+      # for the Play Store you'd add a real signing config later).
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: hawtrix-apk
-          path: artifacts/hawtrix/android/app/build/outputs/apk/debug/app-debug.apk
+          path: artifacts/hawtrix/android/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
