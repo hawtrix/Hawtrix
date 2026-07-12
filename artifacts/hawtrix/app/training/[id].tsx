@@ -2,22 +2,12 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { useState } from "react";
-import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { TRAININGS } from "@/app/(tabs)/training";
 import { Ionicons } from "@expo/vector-icons";
+import { TRAININGS, LEVEL_COLORS } from "@/data/trainings";
 
-const LEVEL_COLORS: Record<string, string> = { Débutant: "#10B981", Intermédiaire: "#F59E0B", Avancé: "#EF4444" };
-
-// Génère les leçons détaillées à partir des modules
 function generateLessons(modules: string[], trainingTitle: string) {
-  const lessonTypes = [
-    { type: "Cours théorique", icon: "book" as const, tag: "Théorie", duration: "10-15 min" },
-    { type: "Vidéo explicative", icon: "videocam" as const, tag: "Vidéo", duration: "2 min" },
-    { type: "Exercices pratiques", icon: "construct" as const, tag: "Pratique", duration: "15-20 min" },
-    { type: "Quiz de validation", icon: "help-circle" as const, tag: "Quiz", duration: "5 min" },
-  ];
-
   const lessons: Array<{
     num: number;
     moduleTitle: string;
@@ -30,20 +20,15 @@ function generateLessons(modules: string[], trainingTitle: string) {
   }> = [];
 
   let num = 1;
-  modules.forEach((mod, modIdx) => {
-    // Pour chaque module: 1 cours théorique + 1 vidéo 2min + 1 exercice pratique
-    const lessonSets = [
+  modules.forEach((mod) => {
+    const sets = [
       { type: "Cours théorique", icon: "book" as const, tag: "Théorie", duration: "10-15 min", title: mod },
       { type: "Vidéo démonstrative", icon: "videocam" as const, tag: "Vidéo · 2 min", duration: "2 min", title: `Démonstration : ${mod}` },
       { type: "Exercices pratiques", icon: "construct" as const, tag: "Pratique", duration: "15-20 min", title: `Mise en pratique : ${mod}` },
     ];
-    lessonSets.forEach(ls => {
-      lessons.push({ num, moduleTitle: mod, ...ls, done: false });
-      num++;
-    });
+    sets.forEach(ls => { lessons.push({ num, moduleTitle: mod, ...ls, done: false }); num++; });
   });
 
-  // Ajouter quiz final
   lessons.push({
     num,
     moduleTitle: "Évaluation finale",
@@ -65,11 +50,22 @@ export default function TrainingDetailScreen() {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const botPad = Platform.OS === "web" ? 34 : insets.bottom;
-  const [activeTab, setActiveTab] = useState<"contenu" | "lecons" | "inclus">("lecons");
+  const [activeTab, setActiveTab] = useState<"lecons" | "contenu" | "inclus">("lecons");
   const [lessonStatus, setLessonStatus] = useState<LessonStatus>({});
+  const [expandedModule, setExpandedModule] = useState<number | null>(0);
 
   const training = TRAININGS.find(t => t.id === id);
-  if (!training) return null;
+  if (!training) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#0A1628", alignItems: "center", justifyContent: "center" }}>
+        <Ionicons name="alert-circle" size={48} color="#FF6B00" />
+        <Text style={{ color: "#FFFFFF", fontSize: 16, marginTop: 12, fontFamily: "Inter_500Medium" }}>Formation introuvable</Text>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20, backgroundColor: "#FF6B00", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}>
+          <Text style={{ color: "#FFFFFF", fontWeight: "700" }}>Retour</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const lessons = generateLessons(training.modules, training.title);
   const completedCount = Object.values(lessonStatus).filter(Boolean).length;
@@ -77,37 +73,30 @@ export default function TrainingDetailScreen() {
 
   const handleLessonPress = (lesson: typeof lessons[0]) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (lesson.tag.includes("Vidéo")) {
-      Alert.alert(
-        `📹 ${lesson.title}`,
-        `Leçon ${lesson.num} · Durée : ${lesson.duration}\n\nLa vidéo de démonstration se lance dans l'application complète.\n\n(Contenu disponible après inscription)`,
-        [
-          { text: "Marquer comme vue", onPress: () => setLessonStatus(s => ({ ...s, [lesson.num]: true })) },
-          { text: "Fermer", style: "cancel" },
-        ]
-      );
-    } else if (lesson.tag.includes("Quiz")) {
-      Alert.alert(
-        `📝 ${lesson.title}`,
-        `Validez vos acquis avec ${lesson.tag === "Quiz final" ? "le quiz final" : "un quiz"}.\n\n(Disponible après avoir complété les leçons précédentes)`,
-        [{ text: "OK" }]
-      );
-    } else {
-      Alert.alert(
-        `📚 ${lesson.title}`,
-        `Leçon ${lesson.num} · ${lesson.type}\nDurée : ${lesson.duration}\n\nContenu théorique disponible après inscription.`,
-        [
-          { text: "Marquer comme lu", onPress: () => setLessonStatus(s => ({ ...s, [lesson.num]: true })) },
-          { text: "Fermer", style: "cancel" },
-        ]
-      );
-    }
+    router.push({
+      pathname: "/training/lesson",
+      params: {
+        trainingId: training.id,
+        moduleTitle: lesson.moduleTitle,
+        lessonTitle: lesson.title,
+        lessonType: lesson.type,
+        lessonNum: lesson.num.toString(),
+        color: training.color,
+      },
+    } as any);
+    setLessonStatus(s => ({ ...s, [lesson.num]: true }));
   };
 
   const handleEnroll = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert("Inscription réussie !", `Vous êtes inscrit à "${training.title}".\n\n${lessons.length} leçons vous attendent. Bon apprentissage ! 🎓`);
   };
+
+  const lessonIconColor = (tag: string) =>
+    tag.includes("Vidéo") ? "#EF4444" :
+    tag.includes("Quiz") ? "#8B5CF6" :
+    tag.includes("Pratique") ? "#10B981" : training.color;
+
+  const lessonBgColor = (tag: string) => lessonIconColor(tag) + "20";
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
@@ -133,19 +122,16 @@ export default function TrainingDetailScreen() {
             </View>
           </View>
         </View>
-
-        {/* Barre de progression */}
         {completedCount > 0 && (
           <View style={styles.progressWrap}>
             <View style={styles.progressBarBg}>
               <View style={[styles.progressBarFill, { width: `${progressPct}%` as any }]} />
             </View>
-            <Text style={styles.progressText}>{progressPct}% complété</Text>
+            <Text style={styles.progressText}>{progressPct}% complété · {completedCount}/{lessons.length} leçons</Text>
           </View>
         )}
       </LinearGradient>
 
-      {/* Onglets */}
       <View style={styles.tabs}>
         {(["lecons", "contenu", "inclus"] as const).map(tab => (
           <TouchableOpacity
@@ -170,50 +156,42 @@ export default function TrainingDetailScreen() {
               <Text style={styles.lessonCompleted}>{completedCount} / {lessons.length} vues</Text>
             </View>
 
-            {/* Grouper par module */}
             {training.modules.map((mod, modIdx) => {
               const modLessons = lessons.filter(l => l.moduleTitle === mod);
+              const isExpanded = expandedModule === modIdx;
+              const modDone = modLessons.filter(l => lessonStatus[l.num]).length;
               return (
                 <View key={modIdx} style={styles.moduleGroup}>
-                  <View style={[styles.moduleGroupHeader, { backgroundColor: training.color + "15" }]}>
+                  <TouchableOpacity
+                    style={[styles.moduleGroupHeader, { backgroundColor: training.color + "15" }]}
+                    onPress={() => setExpandedModule(isExpanded ? null : modIdx)}
+                    activeOpacity={0.8}
+                  >
                     <View style={[styles.moduleNumBadge, { backgroundColor: training.color }]}>
                       <Text style={styles.moduleNumText}>{modIdx + 1}</Text>
                     </View>
-                    <Text style={[styles.moduleGroupTitle, { color: training.color }]}>{mod}</Text>
-                  </View>
-                  {modLessons.map(lesson => (
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.moduleGroupTitle, { color: training.color }]}>{mod}</Text>
+                      <Text style={styles.moduleMeta}>{modLessons.length} leçons · {modDone > 0 ? `${modDone}/${modLessons.length} faites` : "0 complétée"}</Text>
+                    </View>
+                    <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={18} color={training.color} />
+                  </TouchableOpacity>
+
+                  {isExpanded && modLessons.map(lesson => (
                     <TouchableOpacity
                       key={lesson.num}
                       style={[styles.lessonRow, lessonStatus[lesson.num] && styles.lessonRowDone]}
                       onPress={() => handleLessonPress(lesson)}
                       activeOpacity={0.8}
                     >
-                      <View style={[styles.lessonIconWrap, {
-                        backgroundColor: lesson.tag.includes("Vidéo") ? "#EF4444" + "20" :
-                          lesson.tag.includes("Quiz") ? "#8B5CF6" + "20" :
-                          lesson.tag.includes("Pratique") ? "#10B981" + "20" : training.color + "15"
-                      }]}>
-                        <Ionicons
-                          name={lesson.icon}
-                          size={18}
-                          color={lesson.tag.includes("Vidéo") ? "#EF4444" :
-                            lesson.tag.includes("Quiz") ? "#8B5CF6" :
-                            lesson.tag.includes("Pratique") ? "#10B981" : training.color}
-                        />
+                      <View style={[styles.lessonIconWrap, { backgroundColor: lessonBgColor(lesson.tag) }]}>
+                        <Ionicons name={lesson.icon} size={18} color={lessonIconColor(lesson.tag)} />
                       </View>
                       <View style={styles.lessonInfo}>
                         <View style={styles.lessonTitleRow}>
                           <Text style={[styles.lessonNum, { color: training.color }]}>Leçon {lesson.num}</Text>
-                          <View style={[styles.lessonTag, {
-                            backgroundColor: lesson.tag.includes("Vidéo") ? "#EF4444" + "15" :
-                              lesson.tag.includes("Quiz") ? "#8B5CF6" + "15" :
-                              lesson.tag.includes("Pratique") ? "#10B981" + "15" : training.color + "15"
-                          }]}>
-                            <Text style={[styles.lessonTagText, {
-                              color: lesson.tag.includes("Vidéo") ? "#EF4444" :
-                                lesson.tag.includes("Quiz") ? "#8B5CF6" :
-                                lesson.tag.includes("Pratique") ? "#10B981" : training.color
-                            }]}>{lesson.tag}</Text>
+                          <View style={[styles.lessonTag, { backgroundColor: lessonBgColor(lesson.tag) }]}>
+                            <Text style={[styles.lessonTagText, { color: lessonIconColor(lesson.tag) }]}>{lesson.tag}</Text>
                           </View>
                         </View>
                         <Text style={styles.lessonTitle} numberOfLines={2}>{lesson.title}</Text>
@@ -233,19 +211,21 @@ export default function TrainingDetailScreen() {
               );
             })}
 
-            {/* Quiz final */}
             {(() => {
               const quiz = lessons.find(l => l.tag === "Quiz final");
               if (!quiz) return null;
               return (
-                <TouchableOpacity style={[styles.quizFinalCard]} onPress={() => handleLessonPress(quiz)} activeOpacity={0.85}>
+                <TouchableOpacity style={styles.quizFinalCard} onPress={() => handleLessonPress(quiz)} activeOpacity={0.85}>
                   <LinearGradient colors={["#0A1628", "#1E293B"]} style={styles.quizFinalGrad}>
                     <Ionicons name="ribbon" size={28} color="#FF6B00" />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.quizFinalTitle}>Leçon {quiz.num} · Quiz Final</Text>
                       <Text style={styles.quizFinalSub}>Validez vos acquis · Obtenez votre certificat</Text>
                     </View>
-                    <Ionicons name="arrow-forward" size={20} color="#FF6B00" />
+                    {lessonStatus[quiz.num]
+                      ? <Ionicons name="checkmark-circle" size={24} color="#10B981" />
+                      : <Ionicons name="arrow-forward" size={20} color="#FF6B00" />
+                    }
                   </LinearGradient>
                 </TouchableOpacity>
               );
@@ -278,13 +258,13 @@ export default function TrainingDetailScreen() {
             <Text style={styles.cardTitle}>Inclus dans cette formation</Text>
             {[
               { icon: "book", text: `${training.modules.length * 3} cours théoriques complets`, color: training.color },
-              { icon: "videocam", text: `${training.modules.length} vidéos démonstratives (2 min chacune)`, color: "#EF4444" },
+              { icon: "videocam", text: `${training.modules.length} vidéos YouTube (2 min chacune)`, color: "#EF4444" },
               { icon: "construct", text: `${training.modules.length} exercices pratiques guidés`, color: "#10B981" },
               { icon: "help-circle", text: "Quiz de validation par module", color: "#8B5CF6" },
               { icon: "document-text", text: "Documents PDF téléchargeables", color: "#F59E0B" },
               { icon: "ribbon", text: "Certificat Hawtrix à l'issue", color: "#FF6B00" },
               { icon: "time", text: "Accès à vie au contenu", color: "#0F52BA" },
-              { icon: "phone-portrait", text: "Accessible sur mobile hors connexion", color: "#6B7280" },
+              { icon: "phone-portrait", text: "Accessible sur mobile", color: "#6B7280" },
             ].map((item, i) => (
               <View key={i} style={styles.includeRow}>
                 <View style={[styles.includeIconWrap, { backgroundColor: item.color + "20" }]}>
@@ -339,6 +319,7 @@ const styles = StyleSheet.create({
   moduleNumBadge: { width: 24, height: 24, borderRadius: 7, alignItems: "center", justifyContent: "center" },
   moduleNumText: { fontSize: 12, fontWeight: "700", color: "#FFFFFF", fontFamily: "Inter_700Bold" },
   moduleGroupTitle: { flex: 1, fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
+  moduleMeta: { fontSize: 11, color: "#9CA3AF", fontFamily: "Inter_400Regular", marginTop: 1 },
   lessonRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#FFFFFF", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#F5F6FA" },
   lessonRowDone: { backgroundColor: "#F0FDF4" },
   lessonIconWrap: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
