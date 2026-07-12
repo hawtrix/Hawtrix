@@ -76,7 +76,7 @@ jobs:
       - name: Auto-detect and install every package used by the code
         run: |
           cat > detect-deps.mjs << 'DETECTJS'
-          import { readFileSync, readdirSync, statSync } from "fs";
+          import { readFileSync, readdirSync, statSync, existsSync } from "fs";
           import path from "path";
 
           const root = process.cwd();
@@ -89,6 +89,7 @@ jobs:
             "timers","tty","punycode","module","process"
           ]);
           const importRe = /(?:from|require\()\s*['"]([^'"]+)['"]/g;
+          const quotedStringRe = /['"]([^'"]+)['"]/g;
 
           function walk(dir, files = []) {
             for (const entry of readdirSync(dir)) {
@@ -102,7 +103,7 @@ jobs:
           }
 
           function toPackageName(spec) {
-            if (spec.startsWith(".") || spec.startsWith("/") || spec.startsWith("@/")) return null;
+            if (!spec || spec.startsWith(".") || spec.startsWith("/") || spec.startsWith("@/")) return null;
             const parts = spec.split("/");
             if (spec.startsWith("@")) return parts.slice(0, 2).join("/");
             return parts[0];
@@ -115,12 +116,47 @@ jobs:
           ]);
 
           const found = new Set();
+
+          // 1. Scan source files for imports/requires
           for (const file of walk(root)) {
             const content = readFileSync(file, "utf8");
             let m;
             while ((m = importRe.exec(content))) {
               const pkg = toPackageName(m[1]);
               if (pkg && !builtins.has(pkg) && !known.has(pkg)) found.add(pkg);
+            }
+          }
+
+          // 2. Scan app.json / app.config.js / app.config.ts for "plugins" entries
+          function addPluginsFromArray(arr) {
+            for (const entry of arr) {
+              const name = Array.isArray(entry) ? entry[0] : entry;
+              if (typeof name !== "string") continue;
+              const pkg = toPackageName(name);
+              if (pkg && !builtins.has(pkg) && !known.has(pkg)) found.add(pkg);
+            }
+          }
+
+          if (existsSync("app.json")) {
+            try {
+              const appJson = JSON.parse(readFileSync("app.json", "utf8"));
+              const plugins = appJson.expo?.plugins;
+              if (Array.isArray(plugins)) addPluginsFromArray(plugins);
+            } catch {}
+          }
+
+          for (const cfgFile of ["app.config.js", "app.config.ts"]) {
+            if (existsSync(cfgFile)) {
+              const content = readFileSync(cfgFile, "utf8");
+              const pluginsBlockMatch = content.match(/plugins\s*:\s*\[([\s\S]*?)\]/);
+              if (pluginsBlockMatch) {
+                const names = [];
+                let qm;
+                while ((qm = quotedStringRe.exec(pluginsBlockMatch[1]))) {
+                  names.push(qm[1]);
+                }
+                addPluginsFromArray(names);
+              }
             }
           }
 
