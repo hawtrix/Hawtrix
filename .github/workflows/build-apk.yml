@@ -196,22 +196,19 @@ jobs:
           DETECTWORKLETS
           HAS_WORKLETS=$(node detect-worklets.mjs)
 
-          # Auto-detect where the "@/" alias should actually point to.
-          # It looks for a folder that contains both "utils" and "data" subfolders
-          # (the pattern used by imports like "@/utils/api" and "@/data/trainings"),
-          # falling back to a folder that just contains "utils".
           ALIAS_ROOT="."
-          CANDIDATE=$(find . \( -path './node_modules' -o -path './android' -o -path './ios' -o -path './.git' \) -prune -o -type d -name utils -print | while read -r d; do
+          CANDIDATE=$(find . \( -path './node_modules' -o -path './android' -o -path './ios' -o -path './.git' \) -prune -o -type d -iname utils -print | while read -r d; do
             parent=$(dirname "$d")
-            if [ -d "$parent/data" ]; then echo "$parent"; fi
+            if [ -d "$parent/data" ] || [ -d "$parent/Data" ]; then echo "$parent"; fi
           done | head -1)
           if [ -z "$CANDIDATE" ]; then
-            CANDIDATE=$(find . \( -path './node_modules' -o -path './android' -o -path './ios' -o -path './.git' \) -prune -o -type d -name utils -print | head -1 | xargs -r dirname)
+            CANDIDATE=$(find . \( -path './node_modules' -o -path './android' -o -path './ios' -o -path './.git' \) -prune -o -type d -iname utils -print | head -1 | xargs -r dirname)
           fi
           if [ -n "$CANDIDATE" ]; then
             ALIAS_ROOT="$CANDIDATE"
           fi
           echo "Detected @ alias root: $ALIAS_ROOT"
+          echo "ALIAS_ROOT=$ALIAS_ROOT" >> "$GITHUB_ENV"
 
           if [ "$HAS_WORKLETS" = "true" ]; then
             cat > babel.config.js << BABELJS
@@ -253,6 +250,93 @@ jobs:
           fi
           echo "--- babel.config.js ---"
           cat babel.config.js
+
+      - name: Diagnose and fix case-sensitivity mismatches for @/ imports
+        run: |
+          echo "--- Directories that look like 'utils' or 'data' (any case) ---"
+          find . \( -path './node_modules' -o -path './android' -o -path './ios' -o -path './.git' \) -prune -o -type d \( -iname 'utils' -o -iname 'data' \) -print
+
+          cat > fix-case.mjs << 'FIXCASE'
+          import { readFileSync, readdirSync, statSync, existsSync, symlinkSync, mkdirSync } from "fs";
+          import path from "path";
+
+          const aliasRoot = process.env.ALIAS_ROOT || ".";
+          const root = process.cwd();
+          const skipDirs = new Set(["node_modules", "android", "ios", ".git", ".expo", ".expo-shared", "build", "dist"]);
+          const exts = new Set([".ts", ".tsx", ".js", ".jsx"]);
+          const importRe = /from\s+['"]@\/([^'"]+)['"]/g;
+          const candidateSuffixes = ["", ".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.tsx", "/index.js", "/index.jsx"];
+
+          function walk(dir, files = []) {
+            for (const entry of readdirSync(dir)) {
+              if (skipDirs.has(entry)) continue;
+              const full = path.join(dir, entry);
+              const st = statSync(full);
+              if (st.isDirectory()) walk(full, files);
+              else if (exts.has(path.extname(entry))) files.push(full);
+            }
+            return files;
+          }
+
+          function findCaseInsensitive(base, segments) {
+            let current = base;
+            for (const seg of segments) {
+              if (!existsSync(current) || !statSync(current).isDirectory()) return null;
+              const entries = readdirSync(current);
+              const match = entries.find((e) => e.toLowerCase() === seg.toLowerCase());
+              if (!match) return null;
+              current = path.join(current, match);
+            }
+            return current;
+          }
+
+          const specs = new Set();
+          for (const file of walk(root)) {
+            const content = readFileSync(file, "utf8");
+            let m;
+            while ((m = importRe.exec(content))) specs.add(m[1]);
+          }
+
+          const baseDir = path.join(root, aliasRoot);
+          let fixed = 0;
+
+          for (const spec of specs) {
+            const exactExists = candidateSuffixes.some((suffix) => existsSync(path.join(baseDir, spec) + suffix));
+            if (exactExists) continue;
+
+            const segments = spec.split("/");
+            let resolvedReal = null;
+
+            for (const suffix of candidateSuffixes) {
+              const lastWithSuffix = segments[segments.length - 1] + suffix;
+              const segsToTry = suffix.startsWith("/")
+                ? [...segments, ...suffix.slice(1).split("/")]
+                : [...segments.slice(0, -1), lastWithSuffix];
+              const real = findCaseInsensitive(baseDir, segsToTry);
+              if (real && statSync(real).isFile()) {
+                resolvedReal = real;
+                break;
+              }
+            }
+
+            if (!resolvedReal) {
+              console.log(`No case-insensitive match found for @/${spec} — leaving as-is.`);
+              continue;
+            }
+
+            const targetPath = path.join(baseDir, spec) + path.extname(resolvedReal);
+            mkdirSync(path.dirname(targetPath), { recursive: true });
+            if (!existsSync(targetPath)) {
+              symlinkSync(path.relative(path.dirname(targetPath), resolvedReal), targetPath);
+              console.log(`Fixed case mismatch: @/${spec} -> ${path.relative(root, resolvedReal)}`);
+              fixed++;
+            }
+          }
+
+          console.log(`Total case mismatches fixed: ${fixed}`);
+          FIXCASE
+
+          node fix-case.mjs
 
       - name: Expo Prebuild (Android)
         run: npx expo prebuild --platform android --no-install
