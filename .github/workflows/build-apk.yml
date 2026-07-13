@@ -196,8 +196,25 @@ jobs:
           DETECTWORKLETS
           HAS_WORKLETS=$(node detect-worklets.mjs)
 
+          # Auto-detect where the "@/" alias should actually point to.
+          # It looks for a folder that contains both "utils" and "data" subfolders
+          # (the pattern used by imports like "@/utils/api" and "@/data/trainings"),
+          # falling back to a folder that just contains "utils".
+          ALIAS_ROOT="."
+          CANDIDATE=$(find . \( -path './node_modules' -o -path './android' -o -path './ios' -o -path './.git' \) -prune -o -type d -name utils -print | while read -r d; do
+            parent=$(dirname "$d")
+            if [ -d "$parent/data" ]; then echo "$parent"; fi
+          done | head -1)
+          if [ -z "$CANDIDATE" ]; then
+            CANDIDATE=$(find . \( -path './node_modules' -o -path './android' -o -path './ios' -o -path './.git' \) -prune -o -type d -name utils -print | head -1 | xargs -r dirname)
+          fi
+          if [ -n "$CANDIDATE" ]; then
+            ALIAS_ROOT="$CANDIDATE"
+          fi
+          echo "Detected @ alias root: $ALIAS_ROOT"
+
           if [ "$HAS_WORKLETS" = "true" ]; then
-            cat > babel.config.js << 'BABELJS'
+            cat > babel.config.js << BABELJS
           module.exports = function (api) {
             api.cache(true);
             return {
@@ -206,8 +223,8 @@ jobs:
                 [
                   'module-resolver',
                   {
-                    root: ['./'],
-                    alias: { '@': './' },
+                    root: ['$ALIAS_ROOT'],
+                    alias: { '@': '$ALIAS_ROOT' },
                   },
                 ],
                 'react-native-worklets/plugin',
@@ -216,7 +233,7 @@ jobs:
           };
           BABELJS
           else
-            cat > babel.config.js << 'BABELJS'
+            cat > babel.config.js << BABELJS
           module.exports = function (api) {
             api.cache(true);
             return {
@@ -225,8 +242,8 @@ jobs:
                 [
                   'module-resolver',
                   {
-                    root: ['./'],
-                    alias: { '@': './' },
+                    root: ['$ALIAS_ROOT'],
+                    alias: { '@': '$ALIAS_ROOT' },
                   },
                 ],
               ],
