@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Setup pnpm
+      - name: Setup pnpm 10
         uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -30,6 +30,51 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+
+      - name: "[DIAG 1] Versions et SDK Android"
+        run: |
+          echo "Node  : $(node --version)"
+          echo "pnpm  : $(pnpm --version)"
+          echo "Java  : $(java -version 2>&1 | head -1)"
+          for sdk in /usr/local/lib/android/sdk /opt/android-sdk; do
+            [ -d "$sdk" ] && echo "✅ SDK: $sdk — platforms: $(ls $sdk/platforms 2>/dev/null | tr '\n' ' ')" || echo "❌ Absent: $sdk"
+          done
+
+      - name: "PATCH – shamefully-hoist dans .npmrc"
+        run: |
+          grep -v "shamefully-hoist" .npmrc > /tmp/npmrc_tmp || true
+          echo "shamefully-hoist=true" >> /tmp/npmrc_tmp
+          cp /tmp/npmrc_tmp .npmrc
+          cat .npmrc
+
+      - name: "PATCH – metro.config.js monorepo"
+        run: |
+          cat > artifacts/hawtrix/metro.config.js << 'METROEOF'
+          const { getDefaultConfig } = require("expo/metro-config");
+          const path = require("path");
+          const projectRoot = __dirname;
+          const workspaceRoot = path.resolve(projectRoot, "../..");
+          const config = getDefaultConfig(projectRoot);
+          config.watchFolders = [workspaceRoot];
+          config.resolver.nodeModulesPaths = [
+            path.resolve(projectRoot, "node_modules"),
+            path.resolve(workspaceRoot, "node_modules"),
+          ];
+          module.exports = config;
+          METROEOF
+          cat artifacts/hawtrix/metro.config.js
+
+      - name: "PATCH – babel-preset-expo dans package.json"
+        run: |
+          node - << 'NODEEOF'
+          const fs = require("fs");
+          const p = "artifacts/hawtrix/package.json";
+          const pkg = JSON.parse(fs.readFileSync(p, "utf8"));
+          pkg.devDependencies = pkg.devDependencies || {};
+          pkg.devDependencies["babel-preset-expo"] = "*";
+          fs.writeFileSync(p, JSON.stringify(pkg, null, 2) + "\n");
+          console.log("✅ babel-preset-expo ajouté");
+          NODEEOF
 
       - name: Cache pnpm store
         uses: actions/cache@v4
@@ -48,13 +93,26 @@ jobs:
           restore-keys: gradle-${{ runner.os }}-
 
       - name: Installer les dépendances
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
+
+      - name: "[DIAG 2] Modules critiques après install"
+        run: |
+          [ -f "node_modules/babel-preset-expo/package.json" ] && echo "✅ babel-preset-expo à la racine" || echo "❌ ABSENT – Metro va échouer"
+          [ -f "node_modules/@babel/core/package.json" ]       && echo "✅ @babel/core"                  || echo "❌ @babel/core ABSENT"
 
       - name: Expo Prebuild Android
         working-directory: artifacts/hawtrix
         env:
           CI: "1"
         run: pnpm exec expo prebuild --platform android --no-install --clean
+
+      - name: "[DIAG 3] Post-prebuild"
+        working-directory: artifacts/hawtrix
+        run: |
+          ls android/
+          cat android/gradle/wrapper/gradle-wrapper.properties
+          SDK=/usr/local/lib/android/sdk
+          [ -d "$SDK/platforms" ] && echo "✅ platforms: $(ls $SDK/platforms | tr '\n' ' ')" || echo "❌ Aucun platform SDK"
 
       - name: Build APK
         working-directory: artifacts/hawtrix/android
@@ -64,7 +122,7 @@ jobs:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -Dorg.gradle.daemon=false"
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
