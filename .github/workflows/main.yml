@@ -1,0 +1,115 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build APK Android
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Expo Login
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas whoami || eas login --token $EXPO_TOKEN
+
+      - name: Install Expo dependencies
+        run: npx expo install --fix
+
+      - name: Prebuild Android
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Install packages
+        run: npm install
+
+      - name: Verify Android config
+        run: |
+          ls -la android/app/build.gradle
+          cat android/app/build.gradle | head -20
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 33
+          build-tools: 33.0.2
+          cmake: 3.22.1
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Bundle JS and assets
+        run: |
+          npx react-native bundle \
+            --platform android \
+            --dev false \
+            --entry-file index.js \
+            --bundle-output android/app/src/main/assets/index.android.bundle \
+            --assets-dest android/app/src/main/res \
+            --reset-cache
+
+      - name: Build APK with Gradle
+        run: |
+          cd android
+          chmod +x ./gradlew
+          ./gradlew assembleRelease \
+            -x bundleReleaseJsAndAssets \
+            -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+        env:
+          CI: true
+
+      - name: Compile APK Release
+        run: |
+          cd android
+          ./gradlew assembleRelease
+        env:
+          CI: true
+
+      - name: Verify APK exists
+        run: |
+          find android -name "*.apk" -type f
+          ls -lh android/app/build/outputs/apk/release/
+
+      - name: Rename APK
+        run: |
+          APK_FILE=$(find android/app/build/outputs/apk/release/ -name "*.apk" -type f | head -1)
+          if [ -n "$APK_FILE" ]; then
+            cp "$APK_FILE" hawtrix-v2.85.2-release.apk
+            echo "APK_SIZE=$(du -h "$APK_FILE" | cut -f1)" >> $GITHUB_ENV
+          else
+            echo "ERROR: No APK file found!"
+            exit 1
+          fi
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hawtrix-v2.85.2-Android-APK
+          path: hawtrix-v2.85.2-release.apk
+          retention-days: 90
