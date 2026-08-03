@@ -17,99 +17,264 @@ jobs:
         with:
           fetch-depth: 0
 
+      # ============================================================
+      # DIAGNOSTIC 1 : Vérifier la structure du dépôt
+      # ============================================================
+      - name: "DIAGNOSTIC: Vérifier la structure du projet"
+        run: |
+          echo "============================================="
+          echo "CONTENU DU DOSSIER :"
+          echo "============================================="
+          ls -la
+          echo ""
+          echo "============================================="
+          echo "FICHIERS package.json trouvés :"
+          echo "============================================="
+          find . -name "package.json" -type f | sort
+          echo ""
+          echo "============================================="
+          echo "FICHIERS package-lock.json trouvés :"
+          echo "============================================="
+          find . -name "package-lock.json" -type f | sort
+          echo ""
+          echo "============================================="
+          echo "FICHIERS yarn.lock trouvés :"
+          echo "============================================="
+          find . -name "yarn.lock" -type f | sort
+          echo ""
+          echo "============================================="
+          echo "VERSION NODE.JS :"
+          echo "============================================="
+          node --version
+          npm --version
+
+      # 2. Installer Node.js 20
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
+      # ============================================================
+      # DIAGNOSTIC 2 : Vérifier le package.json principal
+      # ============================================================
+      - name: "DIAGNOSTIC: Contenu du package.json principal"
+        run: |
+          echo "============================================="
+          echo "CONTENU DE package.json :"
+          echo "============================================="
+          cat package.json
+          echo ""
+          echo "============================================="
+          echo "DEPENDANCES:"
+          echo "============================================="
+          node -e "const pkg = require('./package.json'); console.log(JSON.stringify(pkg.dependencies || {}, null, 2));"
+
+      # 3. Installer les dépendances (npm install au lieu de npm ci)
+      - name: Install dependencies
+        run: |
+          echo "Installation des dépendances avec npm install..."
+          npm install 2>&1 | tail -30
+          echo ""
+          echo "============================================="
+          echo "DEPENDANCES INSTALLEES :"
+          echo "============================================="
+          ls node_modules/ | head -20
+
+      # 4. Installer EAS CLI
+      - name: Install EAS CLI
+        run: |
+          echo "Installation de EAS CLI..."
+          npm install -g eas-cli
+          eas --version
+
+      # ============================================================
+      # DIAGNOSTIC 3 : Vérifier la connexion Expo
+      # ============================================================
+      - name: "DIAGNOSTIC: Vérification Expo / EAS"
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          echo "============================================="
+          echo "STATUT EXPO TOKEN :"
+          echo "============================================="
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "ERREUR: EXPO_TOKEN non défini dans les secrets GitHub !"
+            echo "Allez dans Settings > Secrets and variables > Actions et ajoutez EXPO_TOKEN"
+          else
+            echo "EXPO_TOKEN est défini (longueur: ${#EXPO_TOKEN})"
+          fi
+          echo ""
+          echo "============================================="
+          echo "CONNECTION EXPO :"
+          echo "============================================="
+          eas whoami 2>&1 || echo "eas login non connecté"
+
+      # 5. Prebuild Android
+      - name: Prebuild Android
+        run: |
+          echo "Exécution de expo prebuild..."
+          npx expo prebuild --platform android --no-install 2>&1 | tail -30
+          echo ""
+          echo "============================================="
+          echo "DOSSIER ANDROID CREE :"
+          echo "============================================="
+          ls -la android/ 2>&1 || echo "ERREUR: Dossier android/ non créé"
+          ls -la android/app/ 2>&1 || echo "ERREUR: android/app/ non créé"
+
+      # ============================================================
+      # DIAGNOSTIC 4 : Vérifier les fichiers Android
+      # ============================================================
+      - name: "DIAGNOSTIC: Vérifier les fichiers Android"
+        run: |
+          echo "============================================="
+          echo "STRUCTURE ANDROID :"
+          echo "============================================="
+          find android -maxdepth 3 -type f -name "*.gradle" | sort
+          echo ""
+          echo "============================================="
+          echo "CONTENU android/app/build.gradle (début) :"
+          echo "============================================="
+          cat android/app/build.gradle 2>&1 | head -30
+          echo ""
+          echo "============================================="
+          echo "PRESENCE DE GRADLEW :"
+          echo "============================================="
+          ls -la android/gradlew 2>&1 || echo "ERREUR: gradlew introuvable"
+          ls -la android/gradlew.bat 2>&1 || echo "ERREUR: gradlew.bat introuvable"
+
+      # 6. Installer Java JDK 17
       - name: Setup Java JDK
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install EAS CLI
-        run: npm install -g eas-cli
-
-      - name: Expo Login
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas whoami || eas login --token $EXPO_TOKEN
-
-      - name: Install Expo dependencies
-        run: npx expo install --fix
-
-      - name: Prebuild Android
-        run: npx expo prebuild --platform android --no-install
-
-      - name: Install packages
-        run: npm install
-
-      - name: Verify Android config
+      # ============================================================
+      # DIAGNOSTIC 5 : Vérifier Java et Android SDK
+      # ============================================================
+      - name: "DIAGNOSTIC: Vérifier Java et Android SDK"
         run: |
-          ls -la android/app/build.gradle
-          cat android/app/build.gradle | head -20
+          echo "============================================="
+          echo "VERSION JAVA :"
+          echo "============================================="
+          java -version 2>&1
+          echo ""
+          echo "============================================="
+          echo "JAVA_HOME :"
+          echo "============================================="
+          echo $JAVA_HOME
+          echo ""
+          echo "============================================="
+          echo "ANDROID_HOME :"
+          echo "============================================="
+          echo $ANDROID_HOME
 
+      # 7. Installer Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
           api-level: 33
           build-tools: 33.0.2
-          cmake: 3.22.1
 
+      # 8. Accepter les licences
       - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses || true
+        run: |
+          echo "Acceptation des licences Android SDK..."
+          yes | sdkmanager --licenses 2>&1 | tail -5 || true
 
+      # ============================================================
+      # DIAGNOSTIC 6 : Vérifier les licences
+      # ============================================================
+      - name: "DIAGNOSTIC: Licences acceptées"
+        run: |
+          echo "============================================="
+          echo "PACKAGES SDK INSTALLES :"
+          echo "============================================="
+          sdkmanager --list 2>&1 | grep -E "build-tools|platforms|platform-tools" | head -10
+
+      # 9. Installer les packages npm (post prebuild)
+      - name: Install packages after prebuild
+        run: |
+          echo "Installation post-prebuild..."
+          npm install 2>&1 | tail -20
+
+      # 10. Bundle JS
       - name: Bundle JS and assets
         run: |
+          echo "Bundling JavaScript..."
+          mkdir -p android/app/src/main/assets
           npx react-native bundle \
             --platform android \
             --dev false \
             --entry-file index.js \
             --bundle-output android/app/src/main/assets/index.android.bundle \
             --assets-dest android/app/src/main/res \
-            --reset-cache
+            --reset-cache 2>&1 | tail -20
+          echo ""
+          echo "============================================="
+          echo "BUNDLE CREE :"
+          echo "============================================="
+          ls -lh android/app/src/main/assets/index.android.bundle 2>&1 || echo "ERREUR: Bundle non créé"
 
+      # 11. Build APK
       - name: Build APK with Gradle
         run: |
+          echo "Compilation APK Release..."
           cd android
           chmod +x ./gradlew
           ./gradlew assembleRelease \
             -x bundleReleaseJsAndAssets \
-            -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
-        env:
-          CI: true
+            -PreactNativeArchitectures=arm64-v8a,armeabi-v7a 2>&1 | tail -50
 
-      - name: Compile APK Release
+      # ============================================================
+      # DIAGNOSTIC 7 : Résultat final du build
+      # ============================================================
+      - name: "DIAGNOSTIC: Résultat du build"
         run: |
-          cd android
-          ./gradlew assembleRelease
-        env:
-          CI: true
-
-      - name: Verify APK exists
-        run: |
-          find android -name "*.apk" -type f
-          ls -lh android/app/build/outputs/apk/release/
-
-      - name: Rename APK
-        run: |
+          echo "============================================="
+          echo "RECHERCHE DES FICHIERS APK :"
+          echo "============================================="
+          find android -name "*.apk" -type f 2>&1
+          echo ""
+          echo "============================================="
+          echo "DOSSIER RELEASE :"
+          echo "============================================="
+          ls -lh android/app/build/outputs/apk/release/ 2>&1 || echo "ERREUR: Dossier release non trouvé"
+          echo ""
+          echo "============================================="
+          echo "TAILLE DE L'APK :"
+          echo "============================================="
           APK_FILE=$(find android/app/build/outputs/apk/release/ -name "*.apk" -type f | head -1)
           if [ -n "$APK_FILE" ]; then
+            du -h "$APK_FILE"
             cp "$APK_FILE" hawtrix-v2.85.2-release.apk
             echo "APK_SIZE=$(du -h "$APK_FILE" | cut -f1)" >> $GITHUB_ENV
+            echo "APK_READY=true" >> $GITHUB_ENV
           else
-            echo "ERROR: No APK file found!"
-            exit 1
+            echo "ERREUR CRITIQUE: Aucun fichier APK trouvé !"
+            echo "APK_READY=false" >> $GITHUB_ENV
           fi
 
+      # 12. Upload APK (si existe)
       - name: Upload APK artifact
+        if: env.APK_READY == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: Hawtrix-v2.85.2-Android-APK
           path: hawtrix-v2.85.2-release.apk
           retention-days: 90
+
+      # ============================================================
+      # DIAGNOSTIC FINAL : Résumé
+      # ============================================================
+      - name: "DIAGNOSTIC FINAL: Résumé du build"
+        run: |
+          echo "============================================="
+          echo "RESUME DU BUILD HAWTRIX v2.85.2"
+          echo "============================================="
+          echo "APK Ready: $APK_READY"
+          echo "APK Size: $APK_SIZE"
+          echo ""
+          echo "Si APK_READY = false, vérifiez les étapes"
+          echo "de diagnostic ci-dessus pour trouver l'erreur."
+          echo "============================================="
