@@ -5,134 +5,348 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build APK Android
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: artifacts/hawtrix
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '22'
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - uses: actions/setup-java@v4
         with:
-          version: 9
+          distribution: temurin
+          java-version: '17'
 
       - name: "DIAGNOSTIC: Structure du projet"
         run: |
-          echo "===== CONTENU DU DOSSIER ====="
+          echo "===== CONTENU ====="
           ls -la
           echo ""
           echo "===== VERSIONS ====="
           node --version
-          pnpm --version
           echo ""
-          echo "===== artifacts/hawtrix/package.json ====="
-          cat artifacts/hawtrix/package.json
+          echo "===== package.json ====="
+          cat package.json | head -30
+          echo ""
+          echo "===== app.json ====="
+          cat app.json
 
-      - name: Install dependencies
-        run: pnpm install
+      - name: Write standalone package.json
+        run: |
+          cat > package.json << 'PKGJSON'
+          {
+            "name": "hawtrix",
+            "version": "2.85.2",
+            "private": true,
+            "main": "expo-router/entry",
+            "scripts": { "start": "expo start" },
+            "dependencies": {
+              "expo": "~54.0.27",
+              "expo-router": "~6.0.17",
+              "expo-constants": "~18.0.11",
+              "expo-linking": "~8.0.10",
+              "expo-splash-screen": "~31.0.12",
+              "expo-status-bar": "~3.0.9",
+              "expo-system-ui": "~6.0.9",
+              "react": "19.1.0",
+              "react-native": "0.81.5",
+              "react-native-gesture-handler": "~2.28.0",
+              "react-native-safe-area-context": "~5.6.0",
+              "react-native-screens": "~4.16.0"
+            },
+            "devDependencies": {
+              "@babel/core": "^7.25.2",
+              "@types/react": "~19.1.10",
+              "typescript": "~5.9.2",
+              "babel-plugin-module-resolver": "^5.0.2"
+            }
+          }
+          PKGJSON
+          echo "legacy-peer-deps=true" > .npmrc
+          cat > metro.config.js << 'METROJS'
+          const { getDefaultConfig } = require('expo/metro-config');
+          const path = require('path');
+          const projectRoot = __dirname;
+          const config = getDefaultConfig(projectRoot);
+          config.watchFolders = [projectRoot];
+          config.resolver.nodeModulesPaths = [path.resolve(projectRoot, 'node_modules')];
+          module.exports = config;
+          METROJS
+
+      - name: "DIAGNOSTIC: package.json après modification"
+        run: |
+          echo "===== NOUVEAU package.json ====="
+          cat package.json
+          echo ""
+          echo "===== .npmrc ====="
+          cat .npmrc
+
+      - name: Install base dependencies
+        run: npm install
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
 
       - name: "DIAGNOSTIC: Dépendances installées"
         run: |
-          echo "===== node_modules dans artifacts/hawtrix ====="
-          ls artifacts/hawtrix/node_modules/ 2>&1 | head -20
+          echo "===== node_modules ====="
+          ls node_modules/ | head -20
           echo ""
           echo "===== expo version ====="
-          cd artifacts/hawtrix && pnpm list expo 2>&1 || echo "expo non trouvé"
+          npx expo --version 2>&1 || echo "expo non trouvé"
 
-      - name: Install Expo CLI globally
-        run: pnpm add -g expo-cli
-
-      - name: Prebuild Android
+      - name: Auto-detect and install missing packages
         run: |
-          cd artifacts/hawtrix
+          cat > detect-deps.mjs << 'DETECTJS'
+          import { readFileSync, readdirSync, statSync, existsSync } from "fs";
+          import path from "path";
+          const root = process.cwd();
+          const skipDirs = new Set(["node_modules", "android", "ios", ".git", ".expo", ".expo-shared", "build", "dist"]);
+          const exts = new Set([".ts", ".tsx", ".js", ".jsx"]);
+          const builtins = new Set(["fs","path","os","crypto","http","https","stream","util","events","buffer","child_process","url","querystring","zlib","assert","net","tls","dns","dgram","cluster","readline","repl","vm","worker_threads","perf_hooks","string_decoder","timers","tty","punycode","module","process"]);
+          const importRe = /(?:from|require\()\s*['"]([^'"]+)['"]/g;
+          const quotedStringRe = /['"]([^'"]+)['"]/g;
+          function walk(dir, files = []) {
+            for (const entry of readdirSync(dir)) {
+              if (skipDirs.has(entry)) continue;
+              const full = path.join(dir, entry);
+              const st = statSync(full);
+              if (st.isDirectory()) walk(full, files);
+              else if (exts.has(path.extname(entry))) files.push(full);
+            }
+            return files;
+          }
+          function toPackageName(spec) {
+            if (!spec || spec.startsWith(".") || spec.startsWith("/") || spec.startsWith("@/")) return null;
+            const parts = spec.split("/");
+            if (spec.startsWith("@")) return parts.slice(0, 2).join("/");
+            return parts[0];
+          }
+          const pkgJson = JSON.parse(readFileSync("package.json", "utf8"));
+          const known = new Set([...Object.keys(pkgJson.dependencies || {}), ...Object.keys(pkgJson.devDependencies || {})]);
+          const found = new Set();
+          for (const file of walk(root)) {
+            const content = readFileSync(file, "utf8");
+            let m;
+            while ((m = importRe.exec(content))) {
+              const pkg = toPackageName(m[1]);
+              if (pkg && !builtins.has(pkg) && !known.has(pkg)) found.add(pkg);
+            }
+          }
+          function addPluginsFromArray(arr) {
+            for (const entry of arr) {
+              const name = Array.isArray(entry) ? entry[0] : entry;
+              if (typeof name !== "string") continue;
+              const pkg = toPackageName(name);
+              if (pkg && !builtins.has(pkg) && !known.has(pkg)) found.add(pkg);
+            }
+          }
+          if (existsSync("app.json")) {
+            try {
+              const appJson = JSON.parse(readFileSync("app.json", "utf8"));
+              const plugins = appJson.expo?.plugins;
+              if (Array.isArray(plugins)) addPluginsFromArray(plugins);
+            } catch {}
+          }
+          const implicitPeers = { "react-native-reanimated": ["react-native-worklets"] };
+          for (const [trigger, peers] of Object.entries(implicitPeers)) {
+            if (known.has(trigger) || found.has(trigger)) {
+              for (const peer of peers) { if (!known.has(peer) && !found.has(peer)) found.add(peer); }
+            }
+          }
+          console.log([...found].join("\n"));
+          DETECTJS
+          MISSING=$(node detect-deps.mjs)
+          echo "===== Packages manquants ====="
+          echo "$MISSING"
+          if [ -n "$MISSING" ]; then
+            echo "Installation..."
+            npx expo install $MISSING --npm
+          else
+            echo "Aucune dépendance manquante."
+          fi
+          npm install
+
+      - name: "DIAGNOSTIC: Après installation deps manquantes"
+        run: |
+          echo "===== node_modules après ====="
+          ls node_modules/ | wc -l
+          echo "packages installés"
+          echo ""
+          echo "===== expo version ====="
+          npx expo --version 2>&1 || echo "expo non trouvé"
+
+      - name: Write babel.config.js
+        run: |
+          cat > detect-worklets.mjs << 'DETECTWORKLETS'
+          import { readFileSync } from "fs";
+          const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+          const all = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+          console.log(all["react-native-worklets"] ? "true" : "false");
+          DETECTWORKLETS
+          HAS_WORKLETS=$(node detect-worklets.mjs)
+          ALIAS_ROOT="."
+          CANDIDATE=$(find . \( -path './node_modules' -o -path './android' -o -path './ios' -o -path './.git' \) -prune -o -type d -iname utils -print | while read -r d; do
+            parent=$(dirname "$d")
+            if [ -d "$parent/data" ] || [ -d "$parent/Data" ]; then echo "$parent"; fi
+          done | head -1)
+          if [ -z "$CANDIDATE" ]; then
+            CANDIDATE=$(find . \( -path './node_modules' -o -path './android' -o -path './ios' -o -path './.git' \) -prune -o -type d -iname utils -print | head -1 | xargs -r dirname)
+          fi
+          if [ -n "$CANDIDATE" ]; then ALIAS_ROOT="$CANDIDATE"; fi
+          echo "Detected @ alias root: $ALIAS_ROOT"
+          echo "ALIAS_ROOT=$ALIAS_ROOT" >> "$GITHUB_ENV"
+          if [ "$HAS_WORKLETS" = "true" ]; then
+            cat > babel.config.js << BABELJS
+          module.exports = function (api) {
+            api.cache(true);
+            return {
+              presets: ['babel-preset-expo'],
+              plugins: [
+                ['module-resolver', { root: ['$ALIAS_ROOT'], alias: { '@': '$ALIAS_ROOT' } }],
+                'react-native-worklets/plugin',
+              ],
+            };
+          };
+          BABELJS
+          else
+            cat > babel.config.js << BABELJS
+          module.exports = function (api) {
+            api.cache(true);
+            return {
+              presets: ['babel-preset-expo'],
+              plugins: [
+                ['module-resolver', { root: ['$ALIAS_ROOT'], alias: { '@': '$ALIAS_ROOT' } }],
+              ],
+            };
+          };
+          BABELJS
+          fi
+          echo "--- babel.config.js ---"
+          cat babel.config.js
+
+      - name: Fix case-sensitivity mismatches for @/ imports
+        run: |
+          echo "--- Directories 'utils' or 'data' ---"
+          find . \( -path './node_modules' -o -path './android' -o -path './ios' -o -path './.git' \) -prune -o -type d \( -iname 'utils' -o -iname 'data' \) -print
+          cat > fix-case.mjs << 'FIXCASE'
+          import { readFileSync, readdirSync, statSync, existsSync, symlinkSync, mkdirSync } from "fs";
+          import path from "path";
+          const aliasRoot = process.env.ALIAS_ROOT || ".";
+          const root = process.cwd();
+          const skipDirs = new Set(["node_modules", "android", "ios", ".git", ".expo", ".expo-shared", "build", "dist"]);
+          const exts = new Set([".ts", ".tsx", ".js", ".jsx"]);
+          const importRe = /from\s+['"]@\/([^'"]+)['"]/g;
+          const candidateSuffixes = ["", ".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.tsx", "/index.js", "/index.jsx"];
+          function walk(dir, files = []) {
+            for (const entry of readdirSync(dir)) {
+              if (skipDirs.has(entry)) continue;
+              const full = path.join(dir, entry);
+              const st = statSync(full);
+              if (st.isDirectory()) walk(full, files);
+              else if (exts.has(path.extname(entry))) files.push(full);
+            }
+            return files;
+          }
+          function findCaseInsensitive(base, segments) {
+            let current = base;
+            for (const seg of segments) {
+              if (!existsSync(current) || !statSync(current).isDirectory()) return null;
+              const entries = readdirSync(current);
+              const match = entries.find((e) => e.toLowerCase() === seg.toLowerCase());
+              if (!match) return null;
+              current = path.join(current, match);
+            }
+            return current;
+          }
+          const specs = new Set();
+          for (const file of walk(root)) {
+            const content = readFileSync(file, "utf8");
+            let m;
+            while ((m = importRe.exec(content))) specs.add(m[1]);
+          }
+          const baseDir = path.join(root, aliasRoot);
+          let fixed = 0;
+          for (const spec of specs) {
+            const exactExists = candidateSuffixes.some((suffix) => existsSync(path.join(baseDir, spec) + suffix));
+            if (exactExists) continue;
+            const segments = spec.split("/");
+            let resolvedReal = null;
+            for (const suffix of candidateSuffixes) {
+              const lastWithSuffix = segments[segments.length - 1] + suffix;
+              const segsToTry = suffix.startsWith("/") ? [...segments, ...suffix.slice(1).split("/")] : [...segments.slice(0, -1), lastWithSuffix];
+              const real = findCaseInsensitive(baseDir, segsToTry);
+              if (real && statSync(real).isFile()) { resolvedReal = real; break; }
+            }
+            if (!resolvedReal) { console.log(`No case-insensitive match for @/${spec} — leaving as-is.`); continue; }
+            const targetPath = path.join(baseDir, spec) + path.extname(resolvedReal);
+            mkdirSync(path.dirname(targetPath), { recursive: true });
+            if (!existsSync(targetPath)) {
+              symlinkSync(path.relative(path.dirname(targetPath), resolvedReal), targetPath);
+              console.log(`Fixed: @/${spec} -> ${path.relative(root, resolvedReal)}`);
+              fixed++;
+            }
+          }
+          console.log(`Total fixed: ${fixed}`);
+          FIXCASE
+          node fix-case.mjs
+
+      - name: Expo Prebuild Android
+        run: |
           echo "===== expo prebuild ====="
           npx expo prebuild --platform android --no-install 2>&1 | tail -30
           echo ""
-          echo "===== Dossier android créé ? ====="
+          echo "===== Dossier android ====="
           ls -la android/ 2>&1 || echo "ERREUR: android/ non créé"
           ls -la android/app/ 2>&1 || echo "ERREUR: android/app/ non créé"
 
       - name: "DIAGNOSTIC: Fichiers Android"
         run: |
-          cd artifacts/hawtrix
           echo "===== gradle files ====="
-          find android -maxdepth 3 -name "*.gradle" | sort 2>&1
+          find android -maxdepth 3 -name "*.gradle" 2>&1 | sort
           echo ""
-          echo "===== gradlew existe ? ====="
+          echo "===== gradlew ====="
           ls -la android/gradlew 2>&1 || echo "ERREUR: gradlew introuvable"
 
-      - name: Install packages after prebuild
+      - name: Build release APK
         run: |
-          cd artifacts/hawtrix
-          pnpm install 2>&1 | tail -20
-
-      - name: Setup Java JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          api-level: 34
-          build-tools: 34.0.0
-
-      - name: Accept Android licenses
-        run: yes | sdkmanager --licenses 2>&1 | tail -5 || true
-
-      - name: Bundle JS
-        run: |
-          cd artifacts/hawtrix
-          mkdir -p android/app/src/main/assets
-          npx react-native bundle \
-            --platform android \
-            --dev false \
-            --entry-file index.js \
-            --bundle-output android/app/src/main/assets/index.android.bundle \
-            --assets-dest android/app/src/main/res \
-            --reset-cache 2>&1 | tail -20
-          echo ""
-          echo "===== Bundle créé ? ====="
-          ls -lh android/app/src/main/assets/index.android.bundle 2>&1 || echo "ERREUR: Bundle non créé"
-
-      - name: Build APK
-        run: |
-          cd artifacts/hawtrix/android
-          chmod +x ./gradlew
-          ./gradlew assembleRelease \
-            -x bundleReleaseJsAndAssets \
-            -PreactNativeArchitectures=arm64-v8a,armeabi-v7a 2>&1 | tail -50
+          echo "===== Build APK Release ====="
+          cd android && chmod +x gradlew && ./gradlew assembleRelease --no-daemon 2>&1 | tail -50
         env:
-          CI: true
+          GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g
 
       - name: "DIAGNOSTIC: APK trouvé ?"
         run: |
           echo "===== Recherche APK ====="
-          find artifacts/hawtrix/android -name "*.apk" -type f 2>&1
+          find . -name "*.apk" -type f 2>&1
           echo ""
-          APK_FILE=$(find artifacts/hawtrix/android/app/build/outputs/apk/release/ -name "*.apk" -type f | head -1)
+          echo "===== Dossier release ====="
+          ls -lh android/app/build/outputs/apk/release/ 2>&1 || echo "ERREUR: non trouvé"
+          APK_FILE=$(find android/app/build/outputs/apk/release/ -name "*.apk" -type f | head -1)
           if [ -n "$APK_FILE" ]; then
-            cp "$APK_FILE" hawtrix-v2.85.2-release.apk
+            cp "$APK_FILE" ../../hawtrix-v2.85.2-release.apk
             echo "APK_SIZE=$(du -h "$APK_FILE" | cut -f1)" >> $GITHUB_ENV
             echo "APK_READY=true" >> $GITHUB_ENV
+            echo "APK FOUND: $APK_FILE"
           else
             echo "ERREUR: Aucun APK trouvé !"
             echo "APK_READY=false" >> $GITHUB_ENV
           fi
 
-      - name: Upload APK
+      - name: Upload APK artifact
         if: env.APK_READY == 'true'
         uses: actions/upload-artifact@v4
         with:
@@ -142,9 +356,12 @@ jobs:
 
       - name: "DIAGNOSTIC FINAL"
         run: |
-          echo "===== RESUME ====="
+          echo "============================================="
+          echo "RESUME DU BUILD HAWTRIX v2.85.2"
+          echo "============================================="
           echo "APK Ready: $APK_READY"
           echo "APK Size: $APK_SIZE"
           if [ "$APK_READY" = "false" ]; then
             echo "VERIFIEZ LES ETAPES DIAGNOSTIC CI-DESSUS"
           fi
+          echo "============================================="
